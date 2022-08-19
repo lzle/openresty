@@ -2,8 +2,20 @@
 
 * [入门](#入门)
     * [安装](#安装)
-    * [OpenResty CLI](#openresty-cli)
-    * [Load Lua](#加载-lua-模块)
+    * [resty](#openresty-cli)
+    * [load module](#加载-lua-模块)
+
+* [LuaJIT & Lua](#luajit&lua)
+    * [语法](lua/README.md)
+    * [发展](#发展)
+    * [优势](#优势)
+    * [FFI](#FFI)
+    
+* [性能优化](#性能优化)
+
+* [性能分析](#性能分析)
+    * [火焰图](#火焰图)
+    
 
 
 ## 入门
@@ -162,10 +174,57 @@ hello, world
 * 最后的两个分号，则代表内置的代码搜索路径。
 
 
-*** 
+## LuaJIT & Lua
 
-收录的第三方 restry 库 [awesome-resty](https://github.com/bungle/awesome-resty)
+### 发展
 
-作者亲自操刀的网站类项目 [opm](https://github.com/openresty/opm)
+标准 Lua 和 LuaJIT 是两回事儿，[LuaJIT](https://luajit.org/luajit.html) 只是兼容了 Lua 5.1 的语法，并对 Lua 5.2 和 5.3 做了选择性支持。
 
-核心模块 Lua nginx module [lua-nginx-module](https://github.com/openresty/lua-nginx-module)
+值得注意的是，OpenResty 并没有直接使用 LuaJIT 官方提供的 2.1.0-beta3 版本，而是在此基础上，维护了自己的 [LuaJIT 分支](https://github.com/openresty/luajit2) ，并扩展了很多独有的 API。
+
+### 优势
+
+其实标准 Lua 出于性能考虑，也内置了虚拟机，所以 Lua 代码并不是直接被解释执行的，而是先由 Lua 编译器编译为字节码（Byte Code），然后再由 Lua 虚拟机执行。
+
+而 LuaJIT 的运行时环境，除了一个汇编实现的 Lua 解释器外，还有一个可以直接生成机器代码的 JIT 编译器。开始的时候，LuaJIT 和标准 Lua 一样，Lua 代码被编译为字节码，字节码被 LuaJIT 的解释器解释执行。
+
+但不同的是，LuaJIT 的解释器会在执行字节码的同时，记录一些运行时的统计信息，比如每个 Lua 函数调用入口的实际运行次数，还有每个 Lua 循环的实际执行次数。
+当这些次数超过某个随机的阈值时，便认为对应的 Lua 函数入口或者对应的 Lua 循环足够热，这时便会触发 JIT 编译器开始工作。
+
+JIT 编译器会从热函数的入口或者热循环的某个位置开始，尝试编译对应的 Lua 代码路径。编译的过程，是把 LuaJIT 字节码先转换成 LuaJIT 自己定义的中间码（IR），
+然后再生成针对目标体系结构的机器码。所以，所谓 LuaJIT 的性能优化，本质上就是让尽可能多的 Lua 代码可以被 JIT 编译器生成机器码，
+而不是回退到 Lua 解释器的解释执行模式。明白了这个道理，你才能理解后面学到的 OpenResty 性能优化的本质。
+
+### FFI
+
+LuaJIT 除了兼容 Lua 5.1 的语法并支持 JIT 外，LuaJIT 还紧密结合了 FFI（Foreign Function Interface），
+可以让你直接在 Lua 代码中调用外部的 C 函数和使用 C 的数据结构。
+
+下面是一个最简单的例子：
+
+```lua
+local ffi = require("ffi")
+ffi.cdef[[
+int printf(const char *fmt, ...);
+]]
+ffi.C.printf("Hello %s!", "world")
+```
+
+短短这几行代码，就可以直接在 Lua 中调用 C 的 printf 函数，打印出 Hello world!。你可以使用 resty 命令来运行它，看下是否成功。
+
+类似的，我们可以用 FFI 来调用 NGINX、OpenSSL 的 C 函数，来完成更多的功能。实际上，FFI 方式比传统的 Lua/C API 方式的性能更优，
+这也是 lua-resty-core 项目存在的意义。
+
+此外，出于性能方面的考虑，LuaJIT 还扩展了 table 的相关函数：table.new 和 table.clear。
+这是两个在性能优化方面非常重要的函数，在 OpenResty 的 lua-resty 库中会被频繁使用。
+
+
+
+
+## 相关链接
+
+[awesome-resty](https://github.com/bungle/awesome-resty)
+
+[opm](https://github.com/openresty/opm)
+
+[lua-nginx-module](https://github.com/openresty/lua-nginx-module)
