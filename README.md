@@ -10,6 +10,7 @@
     * [发展](#发展)
     * [优势](#优势)
     * [FFI](#FFI)
+    * [NYI](#NYI)
     
 * [性能优化](#性能优化)
 
@@ -218,6 +219,63 @@ ffi.C.printf("Hello %s!", "world")
 此外，出于性能方面的考虑，LuaJIT 还扩展了 table 的相关函数：table.new 和 table.clear。
 这是两个在性能优化方面非常重要的函数，在 OpenResty 的 lua-resty 库中会被频繁使用。
 
+### NYI
+
+LuaJIT 的运行时环境，除了一个汇编实现的 Lua 解释器外，还有一个可以直接生成机器代码的 JIT 编译器。
+
+LuaJIT 中 JIT 编译器的实现还不完善，有一些原语它还无法编译，当 JIT 编译器在当前代码路径上遇到它不支持的操作时，便会退回到解释器模式。
+而 JIT 编译器不支持的这些原语，其实就是我们今天要讲的 NYI，全称为 Not Yet Implemented。LuaJIT 的官网上有这些 [NYI 的完整列表](http://wiki.luajit.org/NYI) 。
+
+#### 如何检测 NYI？
+
+LuaJIT 自带的 jit.dump 和 jit.v 模块，它们都可以打印出 JIT 编译器工作的过程。
+
+可以先在 init_by_lua 中，添加以下两行代码：
+
+```lua
+local v = require "jit.v"
+v.on("/tmp/jit.log")
+```
+
+然后，运行你自己的压力测试工具，或者跑几百个单元测试集，让 LuaJIT 足够热，触发 JIT 编译。这些都完成后，再来检查 /tmp/jit.log 的结果。
+
+当然，这个方法相对比较繁琐，如果你想要简单验证的话， 使用 resty 就足够了。
+
+```lua
+$ resty -j v -e 'for i=1, 1000 do 
+    local newstr, n, err = ngx.re.gsub("hello, world", "([a-z])[a-z]+", "[$0,$1]", "i") 
+end'
+[TRACE   1 regex.lua:1081 loop]
+[TRACE   2 (1/10) regex.lua:1116 -> 1]
+[TRACE   3 (1/21) regex.lua:1084 -> 1]
+```
+
+其中，resty 的 -j 就是和 LuaJIT 相关的选项；后面的值为 dump 和 v，就对应着开启 jit.dump 和 jit.v 模式。
+在 jit.v 模块的输出中，每一行都是一个成功编译的 trace 对象。刚刚是一个能够被 JIT 的例子，而如果遇到 NYI 原语，输出里面就会指明 NYI，比如下面这个 pairs 的例子：
+
+
+```lua
+resty -j v -e 'local t = {}
+for i=1,100 do
+    t[i] = i
+end
+
+for i=1, 1000 do
+    for j=1,1000 do
+        for k,v in pairs(t) do
+            local a = 0
+        end
+    end
+end'
+```
+
+它就不能被 JIT，所以结果里，指明了第 8 行中有 NYI 原语。
+
+```lua
+[TRACE   1 t.lua:2 loop]
+[TRACE --- t.lua:7 -- NYI: bytecode 72 at t.lua:8]
+[TRACE --- t.lua:7 -- NYI: bytecode 72 at t.lua:8]
+```
 
 
 
