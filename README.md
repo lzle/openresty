@@ -13,6 +13,9 @@
     * [NYI](#NYI)
     
 * [性能优化](#性能优化)
+    * [阻塞函数](#阻塞函数)
+    * [字符串](#字符串)
+    * [table](#table)
 
 * [性能分析](#性能分析)
     * [火焰图](#火焰图)
@@ -277,6 +280,206 @@ end'
 [TRACE --- t.lua:7 -- NYI: bytecode 72 at t.lua:8]
 ```
 
+## 性能优化
+
+在 OpenResty 中，我们总是优先使用 OpenResty 的 API，然后是 LuaJIT 的 API，使用 Lua 库则需要慎之又慎。
+
+### 阻塞函数
+
+重要原则：避免使用阻塞函数。
+
+OpenResty 之所以可以保持很高的性能，简单来说，是因为它借用了 Nginx 的事件处理和 Lua 的协程机制，所以：
+
+* 在遇到网络 I/O 等需要等待返回才能继续的操作时，就会先调用 Lua 协程的 yield 把自己挂起，然后在 Nginx 中注册回调； 
+  
+* 在 I/O 操作完成（也可能是超时或者出错）后，由 Nginx 回调 resume，来唤醒 Lua 协程。
+
+在这个处理流程中，如果没有使用 cosocket 这种非阻塞的方式，而是用阻塞的函数来处理 I/O，那么 LuaJIT 就不会把控制权交给 Nginx 的事件循环。
+这就会导致，其他的请求要一直排队等待阻塞的事件处理完，才会得到响应。
+
+#### 执行外部命令
+
+很多情况下需要调用外部的命令和工具，来辅助完成一些操作：
+
+```lua
+os.execute("kill -HUP " .. pid) 
+
+os.execute(" cp test.exe /tmp ")
+
+os.execute(" openssl genrsa -des3 -out private.pem 2048 ")
+```
+
+表面上看，os.execute 是 Lua 的内置函数，但是在 OpenResty 的环境中，os.execute 会阻塞当前请求。
+所以，如果这个命令的执行时间特别短，那么影响还不是很大；可如果这个命令，需要执行几百毫秒甚至几秒钟的时间，那么性能就会有急剧的下降。
+
+方案一： 如果有 FFI 库可以使用，那么我们就优先使用 FFI 的方式来调用。
+
+比如，上面我们是用 OpenSSL 的命令行来生成密钥，就可以改为，用 FFI 调用 OpenSSL 的 C 函数的方式来绕过。而对于杀掉某个进程的示例，
+你可以使用 lua-resty-signal 这个 OpenResty 自带的库，来非阻塞地解决。代码实现如下，当然，这里的lua-resty-signal ，其实也是用 FFI 去调用系统函数来解决的。
+
+```lua
+local resty_signal = require "resty.signal"
+local pid = 12345
+
+
+local ok, err = resty_signal.kill(pid, "KILL")
+```
+
+方案二：使用基于 ngx.pipe 的 lua-resty-shell 库。
+
+正如之前介绍过的一样，你可以在 shell.run 中运行你自己的命令，它就是一个非阻塞的操作：
+
+```lua
+$ resty -e 'local shell = require "resty.shell"
+local ok, stdout, stderr, reason, status =
+    shell.run([[echo "hello, world"]])
+    ngx.say(stdout) '
+```
+
+#### 磁盘 I/O
+
+ngx.log 本身就是一个代价不小的函数调用，缺点在于，你不能频繁地去调用它。即使有缓冲区，大量而频繁的磁盘写入，也会严重地影响性能。
+
+可以把日志发送到远端的日志服务器上，这样就可以用 cosocket 来完成非阻塞的网络通信了，也就是把阻塞的磁盘 I/O 丢给日志服务，不要阻塞对外的服务。
+你可以使用 lua-resty-logger-socket ，来完成这样的工作：
+
+```lua
+local logger = require "resty.logger.socket"
+if not logger.initted() then
+    local ok, err = logger.init{
+        host = 'xxx',
+        port = 1234,
+        flush_limit = 1234,
+        drop_limit = 5678,
+    }
+local msg = "foo"
+local bytes, err = logger.log(msg)
+```
+
+#### luasocket
+
+最后，我们来说说 luasocket ，它也是容易被开发者用到的一个 Lua 内置库，经常有人分不清 luasocket 和 OpenResty 提供的 cosocket。
+luasocket 也可以完成网络通信的功能，但它并没有非阻塞的优势。如果你使用了 luasocket，那么性能也会急剧下降。
+
+另外，[lua-resty-socket](https://github.com/thibaultcha/lua-resty-socket/) 其实就是一个二次封装的开源库，它做到了 luasocket 和 cosocket 的兼容。
+
+
+### 字符串
+
+在 Lua 中，字符串是不可变的。并不是说字符串不能做拼接、修改等操作，而是当进行这些操作时，会产生新的字符串对象。
+
+要避免产生中间的无用数据:
+
+```shell
+$ resty -e 'local begin = ngx.now()
+local s = ""
+-- for 循环，使用 .. 进行字符串拼接
+for i = 1, 100000 do
+    s = s .. "a"
+end
+ngx.update_time()
+print(ngx.now() - begin)
+'
+```
+
+更好的方式是采用下面这种方式，减少了临时字符串的产生：
+
+```shell
+$ resty -e 'local begin = ngx.now()
+local t = {}
+-- for 循环，使用数组来保存字符串，自己维护数组的长度
+for i = 1, 100000 do
+    t[i] = "a"
+end
+local s =  table.concat(t, "")
+ngx.update_time()
+print(ngx.now() - begin)
+'
+```
+
+在 ngx.say、ngx.print 、ngx.log、cosocket:send 等这些可能接受大量字符串的 API 中，它不仅接受 string 作为参数，也同时接受 table 作为参数。
+
+### table
+
+#### 预先生成数组
+
+每次新增和删除数组元素的时候，都会涉及到数组的空间分配、resize 和 rehash。
+
+LuaJIT 中的 table.new(narray, nhash) 函数，会预先分配好指定的数组和哈希的空间大小，而不是在插入元素时自增长，这也是它的两个参数 narray 和 nhash 的含义。
+
+```lua
+local new_tab = require "table.new"
+local t = new_tab(100, 0)
+for i = 1, 100 do
+    t[i] = i
+end
+```
+
+#### 自己计算下标
+
+向 table 里面增加元素，最直接的方法，就是调用 table.insert 这个函数来插入元素：
+
+```lua
+local new_tab = require "table.new"
+local t = new_tab(100, 0)
+for i = 1, 100 do
+  table.insert(t, i)
+end
+```
+
+或者是先获取当前数组的长度，通过下标的方式来插入元素：
+
+```shell
+
+local new_tab = require "table.new"
+local t = new_tab(100, 0)
+for i = 1, 100 do
+  t[#t + 1] = i
+end
+```
+
+需要注意的是这两个操作都是 O(n) 的时间复杂度，在热代码中性能不容乐观，并且数组越大时，性能也会越低。
+
+另外，table.getn 并不是 O(1) 的时间复杂度，而是 O(n)。
+
+#### 循环使用
+
+table.clear 函数会把数组中的所有数据清空，但数组的大小不会变。
+
+```shell
+
+local ok, clear_tab = pcall(require, "table.clear")
+if not ok then
+    clear_tab = function (tab)
+    for k, _ in pairs(tab) do
+    tab[k] = nil
+    end
+end
+end
+```
+
+table.clear 函数实际上就是把每一个元素都置为了 nil。
+
+#### table 池
+
+还可以用缓存池的方式来保存多个 table，以便随用随取，官方提供的 lua-tablepool 正是出于这个目的。
+
+```shell
+local tablepool = require "tablepool"
+local tablepool_fetch = tablepool.fetch
+local tablepool_release = tablepool.release
+
+
+local pool_name = "some_tag" 
+local function do_sth()
+     local t = tablepool_fetch(pool_name, 10, 0)
+     -- -- using t for some purposes
+    tablepool_release(pool_name, t) 
+end
+```
+
+注意不要因此滥用 tablepool, 在实际项目中的使用并不多。
+
 
 
 ## 相关链接
@@ -286,3 +489,11 @@ end'
 [opm](https://github.com/openresty/opm)
 
 [lua-nginx-module](https://github.com/openresty/lua-nginx-module)
+
+[nginx 内置变量](https://www.cnblogs.com/jimodetiantang/p/9261758.html)
+
+[http 常见请求头和响应头](https://itbilu.com/other/relate/EJ3fKUwUx.html)
+
+[TCP keepalive](https://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html)
+
+
