@@ -654,4 +654,5 @@ local res, err = ngx_re.split("a,b,c,d", "(,)")
 
 [TCP keepalive](https://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html)
 
+[Test::Nginx](https://openresty.gitbooks.io/programming-openresty/content/testing/test-nginx.html)
 
