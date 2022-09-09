@@ -4,24 +4,23 @@
     * [安装](#安装)
     * [resty](#openresty-cli)
     * [load module](#加载-lua-模块)
-
-* [LuaJIT & Lua](#luajit&lua)
+* [LuaJIT & Lua](#luajit--lua)
     * [语法](lua/README.md)
     * [发展](#发展)
     * [优势](#优势)
     * [FFI](#FFI)
     * [NYI](#NYI)
-    
 * [性能优化](#性能优化)
     * [阻塞函数](#阻塞函数)
     * [字符串](#字符串)
     * [table](#table)
-
+* [API](#API)
+    * [ngx.ctx](#ngxctx)
+    * [ngx.shared.DICT](#ngxsharedDICT)
 * [性能分析](#性能分析)
     * [火焰图](#火焰图)
     
-
-
+    
 ## 入门
 
 OpenResty 诞生于 2007 年，基于成熟的开源组件——NGINX 和 LuaJIT。
@@ -479,6 +478,91 @@ end
 ```
 
 注意不要因此滥用 tablepool, 在实际项目中的使用并不多。
+
+
+## API
+
+[Nginx API for Lua](https://github.com/openresty/lua-nginx-module/#nginx-api-for-lua)
+
+### ngx.ctx
+
+该表可用于存储每个请求的 Lua 上下文数据，并且具有与当前 `request` 有相同的生命周期。
+
+子请求有自己独立的 `ngx.ctx` 数据，与父请求的 `ngx.ctx` 互不影响。
+
+```lua
+location /sub {
+    content_by_lua_block {
+        ngx.say("sub pre: ", ngx.ctx.blah)
+        ngx.ctx.blah = 32
+        ngx.say("sub post: ", ngx.ctx.blah)
+    }
+}
+
+location /main {
+    content_by_lua_block {
+        ngx.ctx.blah = 73
+        ngx.say("main pre: ", ngx.ctx.blah)
+        local res = ngx.location.capture("/sub")
+        ngx.print(res.body)
+        ngx.say("main post: ", ngx.ctx.blah)
+    }
+}
+```
+
+请求 `GET /main` 将会输出：
+
+```shell
+main pre: 73
+sub pre: nil
+sub post: 32
+main post: 73
+```
+
+`ngx.ctx` 查找需要相对昂贵的元方法调用，而且它比通过您自己的函数参数显式传递每个请求的数据要慢得多。
+所以不要滥用这个 API 来保存你自己的函数参数，因为它通常会对性能产生相当大的影响。
+
+永远不要在函数外执行 `local ngx.ctx` 进行模块级别的共享，比如下面不好的示例：
+
+```lua
+-- mymodule.lua
+local _M = {}
+
+-- the following line is bad since ngx.ctx is a per-request
+-- data while this <code>ctx</code> variable is on the Lua module level
+-- and thus is per-nginx-worker.
+local ctx = ngx.ctx
+
+function _M.main()
+    ctx.foo = "bar"
+end
+
+return _M
+```
+
+建议使用下面的方式：
+
+```shell
+-- mymodule.lua
+local _M = {}
+
+function _M.main(ctx)
+    ctx.foo = "bar"
+end
+
+return _M
+```
+
+### ngx.shared.DICT
+
+进程间共享数据的首选，所有操作都是原子的，一般用来做数据的缓存，减少接口调用的次数，如 `acid.cache` 模块。
+
+接口 [methods](https://github.com/openresty/lua-nginx-module#ngxshareddict) 可参考官网示例。
+
+
+
+
+
 
 
 
