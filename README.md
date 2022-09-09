@@ -11,12 +11,15 @@
     * [FFI](#FFI)
     * [NYI](#NYI)
 * [性能优化](#性能优化)
-    * [阻塞函数](#阻塞函数)
+    * [阻塞](#阻塞)
     * [字符串](#字符串)
     * [table](#table)
 * [API](#API)
     * [ngx.ctx](#ngxctx)
     * [ngx.shared.DICT](#ngxsharedDICT)
+    * [ngx.var](#ngxvar)
+    * [ngx.socket.tcp](#ngxsockettcp)
+    * [ngx.re.split](#ngxresplit)
 * [性能分析](#性能分析)
     * [火焰图](#火焰图)
     
@@ -283,7 +286,7 @@ end'
 
 在 OpenResty 中，我们总是优先使用 OpenResty 的 API，然后是 LuaJIT 的 API，使用 Lua 库则需要慎之又慎。
 
-### 阻塞函数
+### 阻塞
 
 重要原则：避免使用阻塞函数。
 
@@ -557,14 +560,83 @@ return _M
 
 进程间共享数据的首选，所有操作都是原子的，一般用来做数据的缓存，减少接口调用的次数，如 `acid.cache` 模块。
 
-接口 [methods](https://github.com/openresty/lua-nginx-module#ngxshareddict) 可参考官网示例。
+支持的方法：
+* get
+* get_stale
+* set
+* safe_set
+* add
+* safe_add
+* replace
+* delete
+* incr
+* lpush
+* rpush
+* lpop
+* rpop
+* llen
+* ttl
+* expire
+* flush_all
+* flush_expired
+* get_keys
+* capacity
+* free_space
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxshareddict) 。
 
 
+### ngx.var
+
+`ngx.var` 是 nginx 内置变量，基本上每个 `ngx.var` 的变量都有相应的 `ngx.req` 方法。
+例如 `ngx.var.request_method` 也可以通过 `ngx.req.get_method` 调用获得，那为啥还要再封装 `ngx.req` 接口呢？
+
+这其实是很多方面因素的综合考虑结果：
+
+* 首先是对性能的考虑。ngx.var 的效率不高，不建议反复读取；
+  
+* 也有对程序友好的考虑，ngx.var 返回的是字符串，而非 Lua 对象，遇到获取 args 这种可能返回多个值的情况，就不好处理了；
+  
+* 另外是对灵活性的考虑，绝大部分的 ngx.var 是只读的，只有很少数的变量是可写的，比如 $args 和 limit_rate，
+  可很多时候，我们会有修改 method、URI 和 args 的需求。
+
+  
+### ngx.socket.tcp
+
+创建 TCP 的 `cosocket` 对象，`cosocket` 是各种 lua-resty-* 非阻塞库的基础。
+
+支持的方法：
+
+* bind
+* connect
+* setclientcert
+* sslhandshake
+* send
+* receive
+* close
+* settimeout
+* settimeouts
+* setoption
+* receiveany
+* receiveuntil
+* setkeepalive
+* getreusedtimes
+
+[官网示例](https://github.com/openresty/lua-nginx-module/#ngxsockettcp) 。
 
 
+### ngx.re.split
 
+字符串切割是很常见的功能，OpenResty 也提供了对应的 API，很多开发者都找不到这样的函数，只能选择自己手写。
 
+为什么呢？其实， ngx.re.split 这个 API 并不在 lua-nginx-module 中，而是在 lua-resty-core 里面；
 
+```lua
+local ngx_re = require "ngx.re"
+
+local res, err = ngx_re.split("a,b,c,d", "(,)")
+-- res is now {"a", ",", "b", ",", "c", ",", "d"}
+```
 
 ## 相关链接
 
@@ -574,9 +646,11 @@ return _M
 
 [lua-nginx-module](https://github.com/openresty/lua-nginx-module)
 
-[nginx 内置变量](https://www.cnblogs.com/jimodetiantang/p/9261758.html)
+[nginx embedded variables](http://nginx.org/en/docs/http/ngx_http_core_module.html#variables)
 
-[http 常见请求头和响应头](https://itbilu.com/other/relate/EJ3fKUwUx.html)
+[HTTP status code](https://github.com/openresty/lua-nginx-module/#http-status-constants)
+
+[HTTP common headers](https://itbilu.com/other/relate/EJ3fKUwUx.html)
 
 [TCP keepalive](https://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html)
 
