@@ -226,7 +226,10 @@ print("hello" .. " world")  --> hello world
 可以调用 tostring() 将数字转成字符串，这种转换一直有效：
 
 ```lua
-print(tostring(10) == "10") --> true
+print(tostring(10) == "10")     --> true
+print(tostring(nil) == "nil")   --> true
+print(tostring("nil") == "nil") --> true
+print(tostring({1, 3}))         --> table: 0x056e28d0
 ```
 
 ### 3、string 模块
@@ -253,7 +256,7 @@ s 为要操作的字符串， pattern 为被替换的字符，repl 要替换的�
 n 替换次数（可以忽略，则全部替换），如：
 
 ```lua
-s, n = string.gsub("aaaa","a","z",3)
+s, n = string.gsub("aaaa", "a", "z", 3)
 print(s, n )    --> zzza	3
 ```
 
@@ -351,7 +354,10 @@ end
 当被转换的参数非字符串数字时，结果为 nil
 
 ```lua
-print(tonumber('abc') == nil) --> true
+print(tonumber('abc') == nil)   --> true
+print(tonumber({1, 3}) == nil)  --> true
+print(tonumber('nil') == nil)   --> true
+print(tonumber(nil) == nil)     --> true
 ```
 
 
@@ -387,9 +393,9 @@ Tutorial
 
 ```lua
 array = {}
-for i=1,3 do
+for i = 1, 3 do
    array[i] = {}
-      for j=1,3 do
+      for j = 1, 3 do
          array[i][j] = i*j
       end
 end
@@ -400,7 +406,7 @@ end
 可以使用 table 数据结构实现字典:
 
 ```lua
-map = { a = '1234', false, c = 10, 0 }
+map = {a = '1234', false, c = 10, 0}
 
 print(map['a'])
 print(map.b)
@@ -424,10 +430,10 @@ false
 
 
 ```lua
-tb = { a = '1234', false, nil, b=nil, c = 10, 0 }
+tb = {a = '1234', false, nil, b = nil, c = 10, 0}
 
-for k,v in pairs(tb) do
-    print(k,v)
+for k, v in pairs(tb) do
+    print(k, v)
 end
 
 1	false
@@ -441,20 +447,20 @@ a	1234
 再看一下 ipairs 的使用：
 
 ```lua
-tb = { a = '1234', false, c = 10, 0 }
+tb = {a = '1234', false, c = 10, 0}
 
-for k,v in ipairs(tb) do
-    print(k,v)
+for k, v in ipairs(tb) do
+    print(k, v)
 end
 
 1	false
 2	0
 
 
-tb = { '1234', false, nil, 10, 0 }
+tb = {'1234', false, nil, 10, 0}
 
-for k,v in ipairs(tb) do
-    print(k,v)
+for k, v in ipairs(tb) do
+    print(k, v)
 end
 
 1	1234
@@ -470,7 +476,7 @@ ipairs 获取数组的下标和值，不会循环 map 的值。并且遇到 nil 
 自动忽略 `map` 类型，只会统计从 1 开始的下标。
 
 ```lua
-tb = { '1234', a = 1, b = 2 }
+tb = {'1234', a = 1, b = 2}
 print(#tb)
 
 1
@@ -479,7 +485,7 @@ print(#tb)
 当出现 `nil` 时，也会统计在内。
 
 ```lua
-tb = { 'a', 'b', nil, 'c', 'd' }
+tb = {'a', 'b', nil, 'c', 'd'}
 print(#tb)
 tb[10] = 'h'
 print(#tb)
@@ -492,10 +498,10 @@ print(#tb)
 谨慎在 luajit 中使用 `#` 统计元素个数，例如下面的统计结果就让人很迷惑：
 
 ```lua
-tb = { 'key1', 100, '123', nil, 'key2' }
+tb = {'key1', 100, '123', nil, 'key2'}
 print(#tb)
 
-tb = { 'key1', 100, nil, '123','key2' }
+tb = {'key1', 100, nil, '123','key2'}
 print(#tb)
 
 -- luajit-2.0.0
@@ -533,7 +539,7 @@ print(str)
 在 `table` 的数组部分指定位置 `pos` 插入值为 `value` 的一个元素. pos 参数可选, 默认为数组部分末尾。
 
 ```lua
-tb = {'a','b'}
+tb = {'a', 'b'}
 table.insert(tb, 'c')
 print(tb[3])
 
@@ -549,7 +555,7 @@ i
 返回 `table` 数组部分位于 `pos` 位置的元素。其后的元素会被前移. `pos` 参数可选, 默认为 `table` 长度, 即从最后一个元素删起。
 
 ```lua
-tb = {'a','b'}
+tb = {'a', 'b'}
 
 table.remove(tb)
 print(tb[2])
@@ -586,8 +592,8 @@ Lua 认为两者不同；nil 只和自己相等。Lua 通过引用比较 tables�
 a = {}; a.x = 1; a.y = 0
 b = {}; b.x = 1; b.y = 0
 c = a
-print(a==c)      -- true
-print(b==c)      -- false
+print(a == c)      -- true
+print(b == c)      -- false
 ```
 Lua 比较数字按传统的数字大小进行，比较字符串按字母的顺序进行，但是字母顺序依赖于本地环境。
 当比较不同类型的值的时候要特别注意：
@@ -732,7 +738,7 @@ for 语句有两大类：
 第一，数值 for 循环：
 
 ```lua
-for var=exp1,exp2,exp3 do 
+for var = exp1, exp2, exp3 do 
     loop-part 
 end
 ```
@@ -742,11 +748,11 @@ exp3 可以省略，默认 step=1。
 
 1. 三个表达式只会被计算一次，并且是在循环开始前。
 ```lua
-for i=10,1,-1 do 
+for i = 10, 1, -1 do 
     print(i)           -- 10，9 ... 1
 end
 
-for i=1,10,1 do 
+for i = 1, 10, 1 do 
     print(i)           -- 1，2 ... 10
 end
 ```
@@ -754,7 +760,7 @@ end
 2. 控制变量 var 是局部变量自动被声明,并且只在循环内有效。
 
 ```lua
-for i=1,10 do 
+for i = 1, 10 do 
     print(i) 
 end 
 max = i                 -- probably wrong! 'i' here is global
@@ -764,7 +770,7 @@ max = i                 -- probably wrong! 'i' here is global
 ```lua
 -- find a value in a list 
 local found = nil
-for i=1,a.n do
+for i = 1, a.n do
     if a[i] == value then
         found = i -- save value of 'i' 
         break 
@@ -801,6 +807,64 @@ break 语句用来退出当前循环（for,repeat,while）。在循环外部不�
 return 用来从函数返回结果，当一个函数自然结束结尾会有一个默认的 return。（这种函数类似 pascal 的过程）
 
 没有 continue， 没有 continue !!
+
+### 5、作用域块
+
+lua
+
+```lua
+a = 0
+
+for i = 1, 2 do
+    a = a + 1
+    b = 1
+end
+
+print(i)    -- nil
+print(a)    -- 2
+print(b)    -- 1
+```
+
+python 与 lua 有所不同
+```python
+a = 1
+
+for i in range(2):
+    a += 1
+    b = 1
+
+print(i)    # 1
+print(a)    # 3
+print(b)    # 1
+```
+
+java 与 python 又完全不同
+
+``` java
+public class FirstSample
+{
+  public static void main(String[] args)
+  {
+    int a = 1;
+    for (int i=0; i<=1; i++) {
+      a++;
+      int b = 1;
+    }
+    System.out.println(i);  # 错误: 找不到符号
+    System.out.println(a);  # 3
+    System.out.println(b);  # 错误: 找不到符号
+  }
+}
+```
+
+相同点：
+* 代码块可以修改外部变量，并使外部变量生效
+
+不同点：
+* java 代码块中定义的变量，外部不可以访问，python 和 lua 可以
+* for 语句定义的变量 i，python 可以访问 lua 不行
+
+
 
 ## 八、函数
 

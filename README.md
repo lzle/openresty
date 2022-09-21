@@ -284,6 +284,12 @@ end'
 
 ## 性能优化
 
+在 OpenResty 2019 年 5 月份发布的 1.15.8.1 版本前 lua-resty-core 默认是不开启的，而这不仅会带来性能损失，更严重的是会造成潜在的 bug。所以，我强烈推荐还在使用历史版本的用户，都手动开启 lua-resty-core。你只需要在 init_by_lua 阶段，增加一行代码就可以了：
+
+```
+require "resty.core"
+```
+
 在 OpenResty 中，我们总是优先使用 OpenResty 的 API，然后是 LuaJIT 的 API，使用 Lua 库则需要慎之又慎。
 
 ### 阻塞
@@ -299,7 +305,7 @@ OpenResty 之所以可以保持很高的性能，简单来说，是因为它借�
 在这个处理流程中，如果没有使用 cosocket 这种非阻塞的方式，而是用阻塞的函数来处理 I/O，那么 LuaJIT 就不会把控制权交给 Nginx 的事件循环。
 这就会导致，其他的请求要一直排队等待阻塞的事件处理完，才会得到响应。
 
-#### 执行外部命令
+#### 1、执行外部命令
 
 很多情况下需要调用外部的命令和工具，来辅助完成一些操作：
 
@@ -338,7 +344,7 @@ local ok, stdout, stderr, reason, status =
     ngx.say(stdout) '
 ```
 
-#### 磁盘 I/O
+#### 2、磁盘 I/O
 
 ngx.log 本身就是一个代价不小的函数调用，缺点在于，你不能频繁地去调用它。即使有缓冲区，大量而频繁的磁盘写入，也会严重地影响性能。
 
@@ -358,7 +364,7 @@ local msg = "foo"
 local bytes, err = logger.log(msg)
 ```
 
-#### luasocket
+#### 3、luasocket
 
 最后，我们来说说 luasocket ，它也是容易被开发者用到的一个 Lua 内置库，经常有人分不清 luasocket 和 OpenResty 提供的 cosocket。
 luasocket 也可以完成网络通信的功能，但它并没有非阻塞的优势。如果你使用了 luasocket，那么性能也会急剧下降。
@@ -403,7 +409,65 @@ print(ngx.now() - begin)
 
 ### table
 
-#### 预先生成数组
+#### 1、优先 LuaJIT APIs
+
+The following APIs can be JIT compiled.
+
+**① table.isempty**
+
+Usage:
+
+```lua
+local isempty = require "table.isempty"
+
+print(isempty({}))  -- true
+print(isempty({nil, dog = nil}))  -- true
+print(isempty({"a", "b"}))  -- false
+print(isempty({nil, 3}))  -- false
+print(isempty({cat = 3}))  -- false
+```
+
+**② table.isarray**
+
+Usage:
+
+```lua
+local isarray = require "table.isarray"
+
+print(isarray{"a", true, 3.14})  -- true
+print(isarray{dog = 3})  -- false
+print(isarray{})  -- true
+```
+
+**③ table.nkeys**
+
+Usage:
+
+```lua
+local nkeys = require "table.nkeys"
+
+print(nkeys({}))  -- 0
+print(nkeys({ "a", nil, "b" }))  -- 2
+print(nkeys({ dog = 3, cat = 4, bird = nil }))  -- 2
+print(nkeys({ "a", dog = 3, cat = 4 }))  -- 3
+```
+
+**④ table.clone**
+
+Usage:
+
+```lua
+local clone = require "table.clone"
+
+local x = {x=12, y={5, 6, 7}}
+local y = clone(x)
+... use y ...
+```
+
+Deep cloning is planned to be supported by adding true as a second argument.
+
+
+#### 2、预先生成数组
 
 每次新增和删除数组元素的时候，都会涉及到数组的空间分配、resize 和 rehash。
 
@@ -417,7 +481,7 @@ for i = 1, 100 do
 end
 ```
 
-#### 自己计算下标
+#### 3、自己计算下标
 
 向 table 里面增加元素，最直接的方法，就是调用 table.insert 这个函数来插入元素：
 
@@ -444,7 +508,7 @@ end
 
 另外，table.getn 并不是 O(1) 的时间复杂度，而是 O(n)。
 
-#### 循环使用
+#### 4、循环使用
 
 table.clear 函数会把数组中的所有数据清空，但数组的大小不会变。
 
@@ -462,7 +526,7 @@ end
 
 table.clear 函数实际上就是把每一个元素都置为了 nil。
 
-#### table 池
+#### 5、table 池
 
 还可以用缓存池的方式来保存多个 table，以便随用随取，官方提供的 lua-tablepool 正是出于这个目的。
 
@@ -656,3 +720,10 @@ local res, err = ngx_re.split("a,b,c,d", "(,)")
 
 [Test::Nginx](https://openresty.gitbooks.io/programming-openresty/content/testing/test-nginx.html)
 
+[LuaLint](http://lua-users.org/wiki/LuaLint)
+
+[Lua CFunction、Valgrind](https://time.geekbang.org/column/article/100564?code=L6RL-eocu27wznXuQuV7XXvNA01tPBYxsdUgLU6wRLI%3D&screen=full)
+
+[Lua CFunction](https://www.lua.org/pil/24.html)
+
+[LuaJIT2](https://github.com/openresty/luajit2)
