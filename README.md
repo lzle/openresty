@@ -25,6 +25,9 @@
     * [ngx.re.gmatch](#ngxregmatch)
     * [ngx.re.sub](#ngxresub)
     * [ngx.re.gsub](#ngxregsub)
+* [Lua Resty](#Resty)
+    * [lua-resty-core](#lua-resty-core)
+    * [lua-resty-string](#lua-resty-string)
 * [性能分析](#性能分析)
     * [火焰图](#火焰图)
     
@@ -811,6 +814,64 @@ end
 [官网示例](https://github.com/openresty/lua-nginx-module#ngxregsub) 
 
 
+## Resty
+
+### lua-resty-core
+
+`Openresty` 内置核心库。
+
+支持的方法：
+
+* resty.core.hash
+* resty.core.base64
+* resty.core.uri
+* resty.core.regex
+* resty.core.exit
+* resty.core.shdict
+* resty.core.var
+* resty.core.ctx
+* get_ctx_table
+* resty.core.request
+* resty.core.response
+* resty.core.misc
+* resty.core.time
+* resty.core.worker
+* resty.core.phase
+* resty.core.ndk
+* resty.core.socket
+* resty.core.param
+* ngx.semaphore
+* ngx.balancer
+* ngx.ssl
+* ngx.ssl.clienthello
+* ngx.ssl.session
+* ngx.re
+* ngx.resp
+* ngx.pipe
+* ngx.process
+* ngx.errlog
+* ngx.base64
+
+[官网示例](https://github.com/openresty/lua-resty-core)
+
+### lua-resty-string
+
+包含一些 md5、sha1 的处理函数。
+
+支持的方法：
+
+* resty.sha1
+* resty.md5
+* resty.sha224
+* resty.sha256
+* resty.sha512
+* resty.sha384
+* resty.random
+* resty.aes
+
+[官网示例](https://github.com/openresty/lua-resty-string)
+
+
 ## 相关链接
 
 [awesome-resty](https://github.com/bungle/awesome-resty)
@@ -838,3 +899,5 @@ end
 [LuaJIT2](https://github.com/openresty/luajit2)
 
 [Lua 5.1 Reference Manual](https://www.lua.org/manual/5.1/manual.html)
+
+[Nginx API for Lua](https://github.com/openresty/lua-nginx-module/#nginx-api-for-lua)
