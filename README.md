@@ -727,3 +727,5 @@ local res, err = ngx_re.split("a,b,c,d", "(,)")
 [Lua CFunction](https://www.lua.org/pil/24.html)
 
 [LuaJIT2](https://github.com/openresty/luajit2)
+
+[Lua 5.1 Reference Manual](https://www.lua.org/manual/5.1/manual.html)

@@ -236,48 +236,28 @@ print(tostring({1, 3}))         --> table: 0x056e28d0
 
 Lua 提供了很多的方法来支持字符串的操作：
 
-① 字符串全部转为大写字母 `string.upper(s)`:
+**① 字符串全部转为大写字母 `string.upper(s)`**。
 
 ```lua
 s = string.upper("hello world")
 print(s)        --> HELLO WORLD
 ```
 
-② 字符串全部转为小写字母 `string.lower(s)`:
+**② 字符串全部转为小写字母 `string.lower(s)`**。
 
 ```lua
 s = string.lower("HELLO WORLD")
 print(s)        --> hello world
 ```
 
-③ 在字符串中替换 `string.gsub(s, pattern, repl, n)`。
-
-s 为要操作的字符串， pattern 为被替换的字符，repl 要替换的字符，
-n 替换次数（可以忽略，则全部替换），如：
-
-```lua
-s, n = string.gsub("aaaa", "a", "z", 3)
-print(s, n )    --> zzza	3
-```
-
-④ 查找字符串 `string.find(s, pattern, init, plain)`。
-
-在一个指定的目标字符串 str 中搜索指定的内容 substr，如果找到了一个匹配的子串，
-就会返回这个子串的起始索引和结束索引，不存在则返回 nil。
-
-```lua
-s, e = string.find("Hello Lua user", "Lua", 1)
-print(s, e)     --> 7 9
-```
-
-⑤ 字符串反转 `string.reverse(s)`。
+**③ 字符串反转 `string.reverse(s)`**。
 
 ```lua
 s = string.reverse('lua')
 print(s)        --> aul
 ```
 
-⑥ 字符串格式化  `string.format(formatstring, ...)`。
+**④ 字符串格式化  `string.format(formatstring, ...)`**。
 
 ```lua
 s = string.format("the value is:%d", 4)
@@ -285,14 +265,27 @@ print(s)        --> the value is:4
 ```
 
 
-⑦ 字符串拷贝 `string.rep(s, n, sep)`。
+**⑤ 字符串拷贝 `string.rep(s, n, sep)`**。
 
 ```lua
 s = string.rep("abcd",2)
 print(s)        --> abcdabcd
 ```
 
-⑧ 字符串匹配 `string.gmatch(s, pattern)`。
+**⑥ 字符串匹配 `string.match(s, pattern, init)`**。
+
+string.match() 只寻找源字串 str 中的第一个配对. 参数 init 可选, 指定搜寻过程的起点, 默认为1。
+在成功配对时, 函数将返回配对表达式中的所有捕获结果; 如果没有设置捕获标记, 则返回整个配对字符串。
+当没有成功的配对时, 返回nil。
+
+```lua
+s = string.match("I have 2 questions for you.", "%d+ %a+")
+print(s)        --> 2 questions
+```
+
+Looks for the first match of pattern in the string s. If it finds one, then match returns the captures from the pattern; otherwise it returns nil. If pattern specifies no captures, then the whole match is returned. A third, optional numerical argument init specifies where to start the search; its default value is 1 and can be negative.
+
+**⑦ 字符串匹配 `string.gmatch(s, pattern)`**。
 返回一个迭代器函数，每一次调用这个函数，返回一个在字符串 str 找到的下一个符合 pattern 描述的子串。
 如果参数 pattern 描述的字符串没有找到，迭代函数返回nil。
 
@@ -305,19 +298,11 @@ end
 --Lua
 --User
 ```
+Returns an iterator function that, each time it is called, returns the next captures from pattern over string s. If pattern specifies no captures, then the whole match is produced in each call.
 
-⑨ 字符串匹配 `string.match(s, pattern, init)`。
+For this function, a '^' at the start of a pattern does not work as an anchor, as this would prevent the iteration.
 
-string.match() 只寻找源字串 str 中的第一个配对. 参数 init 可选, 指定搜寻过程的起点, 默认为1。
-在成功配对时, 函数将返回配对表达式中的所有捕获结果; 如果没有设置捕获标记, 则返回整个配对字符串。
-当没有成功的配对时, 返回nil。
-
-```lua
-s = string.match("I have 2 questions for you.", "%d+ %a+")
-print(s)        --> 2 questions
-```
-
-⑩ 字符串截取 `string.sub(s, i, j)`。
+**⑧ 字符串截取 `string.sub(s, i, j)`**。
 
 * s：要截取的字符串。
 * i：截取开始位置。
@@ -327,6 +312,71 @@ print(s)        --> 2 questions
 local s = string.sub('hello,world!', 4, 8)
 print(s)        --> lo,wo
 ```
+
+Returns the substring of s that starts at i and continues until j; i and j can be negative. If j is absent, then it is assumed to be equal to -1 (which is the same as the string length). In particular, the call string.sub(s,1,j) returns a prefix of s with length j, and string.sub(s, -i) returns a suffix of s with length i.
+
+**⑨ 在字符串中替换 `string.gsub(s, pattern, repl, n)`**。
+
+s 为要操作的字符串， pattern 为被替换的字符，repl 要替换的字符，
+n 替换次数（可以忽略，则全部替换），如：
+
+```lua
+s, n = string.gsub("aaaa", "a", "z", 3)
+print(s, n)    --> zzza	3
+```
+
+Returns a copy of s in which all (or the first n, if given) occurrences of the pattern have been replaced by a replacement string specified by repl, which can be a string, a table, or a function. gsub also returns, as its second value, the total number of matches that occurred.
+
+If repl is a string, then its value is used for replacement. The character % works as an escape character: any sequence in repl of the form %n, with n between 1 and 9, stands for the value of the n-th captured substring (see below). The sequence %0 stands for the whole match. The sequence %% stands for a single %.
+
+If repl is a table, then the table is queried for every match, using the first capture as the key; if the pattern specifies no captures, then the whole match is used as the key.
+
+If repl is a function, then this function is called every time a match occurs, with all captured substrings passed as arguments, in order; if the pattern specifies no captures, then the whole match is passed as a sole argument.
+
+If the value returned by the table query or by the function call is a string or a number, then it is used as the replacement string; otherwise, if it is false or nil, then there is no replacement (that is, the original match is kept in the string).
+
+Here are some examples:
+
+```lua
+x = string.gsub("hello world", "(%w+)", "%1 %1")
+--> x="hello hello world world"
+
+x = string.gsub("hello world", "%w+", "%0 %0", 1)
+--> x="hello hello world"
+
+x = string.gsub("hello world from Lua", "(%w+)%s*(%w+)", "%2 %1")
+--> x="world hello Lua from"
+
+x = string.gsub("home = $HOME, user = $USER", "%$(%w+)", os.getenv)
+--> x="home = /home/roberto, user = roberto"
+
+x = string.gsub("4+5 = $return 4+5$", "%$(.-)%$", function (s)
+   return loadstring(s)()
+ end)
+--> x="4+5 = 9"
+
+local t = {name="lua", version="5.1"}
+x = string.gsub("$name-$version.tar.gz", "%$(%w+)", t)
+--> x="lua-5.1.tar.gz"
+```
+
+**⑩ 查找字符串 `string.find(s, pattern, init, plain)`**。
+
+在一个指定的目标字符串 str 中搜索指定的内容 substr，如果找到了一个匹配的子串，
+就会返回这个子串的起始索引和结束索引，不存在则返回 nil。
+
+```lua
+s, e = string.find("Hello Lua user", "Lua", 1)
+print(s, e)     --> 7 9
+```
+
+Looks for the first match of pattern in the string s. If it finds a match, then find returns the indices of s where this occurrence starts and ends; otherwise, it returns nil. A third, optional numerical argument init specifies where to start the search; its default value is 1 and can be negative. A value of true as a fourth, optional argument plain turns off the pattern matching facilities, so the function does a plain "find substring" operation, with no characters in pattern being considered "magic". Note that if plain is given, then init must be given as well.
+
+If the pattern has captures, then in a successful match the captured values are also returned, after the two indices.
+
+**⑪  字符串长度 `string.len (s)`**。
+
+Receives a string and returns its length. The empty string "" has length 0. Embedded zeros are counted, so "a\000bc\000" has length 5.
 
 
 ## 四、数值
@@ -1259,5 +1309,10 @@ print ("Return Value: ", retval)  -- will print "100"
 print ("Hello World")    -- Prints "Hello World"
 ```
 
-
 [《using-pcall》](https://riptutorial.com/lua/example/16000/using-pcall)
+
+
+
+## 相关链接
+
+[Lua 5.1 Reference Manual](https://www.lua.org/manual/5.1/manual.html)
