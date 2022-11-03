@@ -20,6 +20,11 @@
     * [ngx.var](#ngxvar)
     * [ngx.socket.tcp](#ngxsockettcp)
     * [ngx.re.split](#ngxresplit)
+    * [ngx.re.match](#ngxrematch)
+    * [ngx.re.find](#ngxresfind)
+    * [ngx.re.gmatch](#ngxregmatch)
+    * [ngx.re.sub](#ngxresub)
+    * [ngx.re.gsub](#ngxregsub)
 * [性能分析](#性能分析)
     * [火焰图](#火焰图)
     
@@ -647,7 +652,7 @@ return _M
 * capacity
 * free_space
 
-[官网示例](https://github.com/openresty/lua-nginx-module#ngxshareddict) 。
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxshareddict) 
 
 
 ### ngx.var
@@ -686,7 +691,7 @@ return _M
 * setkeepalive
 * getreusedtimes
 
-[官网示例](https://github.com/openresty/lua-nginx-module/#ngxsockettcp) 。
+[官网示例](https://github.com/openresty/lua-nginx-module/#ngxsockettcp) 
 
 
 ### ngx.re.split
@@ -701,6 +706,110 @@ local ngx_re = require "ngx.re"
 local res, err = ngx_re.split("a,b,c,d", "(,)")
 -- res is now {"a", ",", "b", ",", "c", ",", "d"}
 ```
+
+### ngx.re.match
+
+Matches the subject string using the Perl compatible regular expression regex with the optional options.
+
+```lua
+local m, err = ngx.re.match("hello, 1234", "([0-9])[0-9]+")
+ -- m[0] == "1234"
+ -- m[1] == "1"
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxrematch) 
+
+
+### ngx.re.find
+
+Similar to ngx.re.match but only returns the beginning index (from) and end index (to) of the matched substring. The returned indexes are 1-based and can be fed directly into the string.sub API function to obtain the matched substring.
+
+```lua
+local s = "hello, 1234"
+local from, to, err = ngx.re.find(s, "([0-9]+)", "jo")
+if from then
+    ngx.say("from: ", from)
+    ngx.say("to: ", to)
+    ngx.say("matched: ", string.sub(s, from, to))
+else
+    if err then
+        ngx.say("error: ", err)
+        return
+    end
+    ngx.say("not matched!")
+end
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxrefind) 
+
+### ngx.re.gmatch
+
+Similar to ngx.re.match, but returns a Lua iterator instead, so as to let the user programmer iterate all the matches over the <subject> string argument with the PCRE regex.
+
+```lua
+local iterator, err = ngx.re.gmatch("hello, world!", "([a-z]+)", "i")
+if not iterator then
+    ngx.log(ngx.ERR, "error: ", err)
+    return
+end
+
+local m
+m, err = iterator()    -- m[0] == m[1] == "hello"
+if err then
+    ngx.log(ngx.ERR, "error: ", err)
+    return
+end
+
+m, err = iterator()    -- m[0] == m[1] == "world"
+if err then
+    ngx.log(ngx.ERR, "error: ", err)
+    return
+end
+
+m, err = iterator()    -- m == nil
+if err then
+    ngx.log(ngx.ERR, "error: ", err)
+    return
+end
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxregmatch) 
+
+
+### ngx.re.sub
+
+Substitutes the first match of the Perl compatible regular expression regex on the subject argument string with the string or function argument replace. The optional options argument has exactly the same meaning as in ngx.re.match.
+
+```lua
+local newstr, n, err = ngx.re.sub("hello, 1234", "([0-9])[0-9]", "[$0][$1]")
+if not newstr then
+    ngx.log(ngx.ERR, "error: ", err)
+    return
+end
+
+-- newstr == "hello, [12][1]34"
+-- n == 1
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxresub) 
+
+### ngx.re.gsub
+
+Just like ngx.re.sub, but does global substitution.
+
+```lua
+local newstr, n, err = ngx.re.gsub("hello, world", "([a-z])[a-z]+", "[$0,$1]", "i")
+if not newstr then
+    ngx.log(ngx.ERR, "error: ", err)
+    return
+end
+
+-- newstr == "[hello,h], [world,w]"
+-- n == 2
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxregsub) 
+
 
 ## 相关链接
 
