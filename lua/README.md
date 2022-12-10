@@ -24,9 +24,11 @@ Lua 将简单的过程语法与基于关联数组和可扩展语义的强大数�
 
 八、[函数](#八函数)
 
-九、[模块](#九模块)
+九、[迭代器与泛型 for](#九迭代器与泛型-for)
 
-十、[错误处理](#十错误处理)
+十、[模块](#十模块)
+
+十一、[错误处理](#十一错误处理)
 
 ## 一、基本语法
 
@@ -165,6 +167,11 @@ print(b) --> nil
 ```
 
 这样变量 b 就好像从没被使用过一样。换句话说, 当且仅当一个变量不等于 nil 时，这个变量存在。
+
+### 3、类型和值
+
+Lua 语言中有 8 种基本类型，nil(空)、boolean(布尔)、number(数值)、string(字符串)、userdata(用户数据)、
+function(函数)、thread(线程)和table(表)。
 
 
 ## 三、字符串
@@ -938,12 +945,38 @@ f(3, 4, 5) a=3, b=4 (5 is discarded)
 
 ### 1、 返回多个结果值
 
-Lua 函数可以返回多个结果值，比如 string.find，其返回匹配串“开始和结束的下标”
-（如果不存在匹配串返回 nil）。
+Lua 函数可以返回多个结果值，比如 string.find，其返回匹配串"开始和结束的下标"（如果不存在匹配串返回 nil）。
 
 ```lua
 s, e = string.find("hello Lua users", "Lua") 
-print(s, e) --> 7 9
+print(s, e)     --> 7 9
+```
+
+函数多值返回的特殊函数 unpack，接受一个数组作为输入参数，返回数组的所有元素。
+
+```lua
+t = {10, 20, 30}
+print(unpack(t))    --> 102030
+```
+
+在 C 语言中可以使用函数指针调用可变的函数，可以声明参数可变的函数，但不能两者同时可变。
+在 Lua 中如果你想调用可变参数的可变函数只需要这样。
+
+```lua
+f = string.find 
+a = {"hello", "ll"} 
+print(f(unpack(a))) --> 3 4
+```
+
+预定义的 `unpack` 函数是用 C 语言实现的，我们也可以用 Lua 来完成。
+
+```lua
+function unpack(t, i)
+    i = i or 1
+    if t[i] then
+        return t[i], unpack(t, i + 1)
+    end
+end
 ```
 
 ### 2、 可变参数
@@ -953,6 +986,7 @@ Lua 函数可以接受可变数目的参数，和 C 语言类似在函数参数�
 arg 表中还有一个域 n 表示参数的个数。
 
 ```lua
+-- 测试函数内并没有 arg 变量！！
 function g (a, b, ...) end
 
 g(3)            a=3, b=nil, arg={n=0} 
@@ -961,8 +995,8 @@ g(3, 4, 5, 8)   a=3, b=4, arg={5, 8; n=2}
 ```
 
 如上面所示，Lua 会将前面的实参传给函数的固定参数，后面的实参放在 arg 表中。
-举个具体的例子，如果我们只想要 string.find 返回的第二个值：
-一个典型的方法是使用虚变量（下划线）
+
+如果我们只想要 string.find 返回的第二个值，一个典型的方法是使用虚变量（下划线）。
 
 ```lua
 local _, x = string.find(s, p) 
@@ -972,19 +1006,24 @@ local _, x = string.find(s, p)
 
 ### 3、 命名参数
 
-Lua 的函数参数是和位置相关的，调用时实参会按顺序依次传给形参。有时候用名
-字指定参数是很有用的，比如 rename 函数用来给一个文件重命名，有时候我们我们记不清命名前后两个参数的顺序了：
+Lua 的函数参数是和位置相关的，调用时实参会按顺序依次传给形参。有时候用名字指定参数是很有用的，
+比如 rename 函数用来给一个文件重命名，有时候我们我们记不清命名前后两个参数的顺序了：
 
 ```lua
+function rename(old, new)
+    print(old)
+    print(new)
+end
+
 -- invalid code 
-rename(old="temp.lua", new="temp1.lua")
+rename(old="old.lua", new="new.lua")
 ```
 
 上面这段代码是无效的，Lua 可以通过将所有的参数放在一个表中，把表作为函数
 的唯一参数来实现上面这段伪代码的功能。因为 Lua 语法支持函数调用时实参可以是表的构造。
 
 ```lua
-rename({old="temp.lua", new="temp1.lua"})
+rename({old="old.lua", new="new.lua"})
 ```
 
 根据这个想法我们重定义了 rename：
@@ -997,13 +1036,11 @@ end
 
 当函数的参数很多的时候，这种函数参数的传递方式很方便的。
 
-
-
 ### 4、 闭包
 
-当一个函数内部嵌套另一个函数定义时，内部的函数体可以访问外部的函数的局部
-变量，这种特征我们称作词法定界。虽然这看起来很清楚，事实并非如此，词法定界加
-上第一类函数在编程语言里是一个功能强大的概念，很少语言提供这种支持。
+当一个函数内部嵌套另一个函数定义时，内部的函数体可以访问外部的函数的局部变量，
+这种特征我们称作词法定界。虽然这看起来很清楚，事实并非如此，
+词法定界加上第一类函数在编程语言里是一个功能强大的概念，很少语言提供这种支持。
 
 看下面的代码：
 
@@ -1020,17 +1057,20 @@ end
 c1 = newCounter()
 print(c1()) --> 1 
 print(c1()) --> 2
+
+c2 = newCounter()
+print(c2()) --> 1 
 ```
 
-匿名函数使用 upvalue i 保存他的计数，当我们调用匿名函数的时候 i 已经超出了作
-用范围，因为创建 i 的函数 newCounter 已经返回了。然而 Lua 用闭包的思想正确处理了这种情况。
+匿名函数使用 upvalue(外部局部变量) i 保存他的计数，当我们调用匿名函数的时候 i 已经超出了作用范围，
+因为创建 i 的函数 newCounter 已经返回了。然而 Lua 用闭包的思想正确处理了这种情况。
 简单的说闭包是一个函数加上它可以正确访问的 upvalues。如果我们再次调用 newCounter，
 将创建一个新的局部变量 i，因此我们得到了一个作用在新的变量 i 上的新闭包。
 
 ### 5、 非全局函数
 
-Lua 中函数可以作为全局变量也可以作为局部变量，我们已经看到一些例子：函数
-作为 table 的域（大部分 Lua 标准库使用这种机制来实现的比如 io.read、math.sin）。
+Lua 中函数可以作为全局变量也可以作为局部变量，我们已经看到一些例子：
+函数作为 table 的域（大部分 Lua 标准库使用这种机制来实现的比如 io.read、math.sin）。
 这种情况下，必须注意函数和表语法：
 
 1. 表和函数放在一起
@@ -1106,8 +1146,7 @@ end
 
 ### 6、 正确的尾调用
 
-Lua 中函数的另一个有趣的特征是可以正确的处理尾调用（proper tail recursion，一
-些书使用术语“尾递归”，虽然并未涉及到递归的概念）。
+Lua 中函数的另一个有趣的特征是可以正确的处理尾调用。
 尾调用是一种类似在函数结尾的 goto 调用，当函数最后一个动作是调用另外一个函数时，
 我们称这种调用尾调用。例如：
 
@@ -1120,8 +1159,10 @@ end
 g 的调用是尾调用。
 
 例子中 f 调用 g 后不会再做任何事情，这种情况下当被调用函数 g 结束时程序不需要返回到调用者 f；
-所以尾调用之后程序不需要在栈中保留关于调用者的任何信息。一些编译器比如 Lua 解释器利用这种特性在处理尾调用时不使用额外的栈，我们称这种语
-言支持正确的尾调用。 由于尾调用不需要使用栈空间，那么尾调用递归的层次可以无限制的。例如下面调用不论 n 为何值不会导致栈溢出。
+所以尾调用之后程序不需要在栈中保留关于调用者的任何信息。
+一些编译器比如 Lua 解释器利用这种特性在处理尾调用时不使用额外的栈，我们称这种语言支持正确的尾调用。 
+
+由于尾调用不需要使用栈空间，那么尾调用递归的层次可以无限制的。例如下面调用不论 n 为何值不会导致栈溢出。
 
 ```lua
 function foo (n) 
@@ -1155,7 +1196,148 @@ Lua 中类似 return g(...)这种格式的调用是尾调用。但是 g 和 g �
 return x[i].foo(x[j] + a*b, i + j)
 ```
 
-## 九、模块
+## 九、迭代器与泛型 for
+
+### 1、迭代器与闭包
+
+迭代器需要保留上一次成功调用的状态和下一次成功调用的状态，也就是他知道来自于哪里和将要前往哪里。
+闭包提供的机制可以很容易实现这个任务。
+
+举一个简单的例子，我们为一个 list 写一个简单的迭代器，
+与 ipairs()不同的是我们实现的这个迭代器返回元素的值而不是索引下标：
+
+```lua
+function list_iter(t)
+    local i = 0
+    local n = table.getn(t)
+    return function()
+        i = i + 1
+        if i <= n then
+            return t[i]
+        end
+    end
+end
+```
+
+可以在 while 语句中使用这个迭代器：
+
+```lua
+t = { 10, 20, 30 }
+iter = list_iter(t) -- creates the iterator 
+while true do
+    local element = iter() -- calls the iterator 
+    if element == nil then
+        break
+    end
+    print(element)
+end 
+```
+
+我们设计的这个迭代器也很容易用于范性 for 语句
+
+```lua
+t = {10, 20, 30} 
+for element in list_iter(t) do  
+    print(element) 
+end
+```
+
+当迭代器返回 nil 时循环结束, 仅当第一个值为 nil 时迭代停止。
+
+```lua
+local function list_iter(t)
+    local i = 0
+    local n = table.getn(t)
+    return function()
+        i = i + 1
+        if i == 3 then
+            return i, nil
+        elseif i == 4 then
+            return nil, t[i]
+        end
+
+        if i <= n then
+            return i, t[i]
+        end
+    end
+end
+
+local t = {10, 20, 30, 40, 50}
+for i,element in list_iter(t) do   
+    print(i, ':', element)
+end
+--1:10
+--2:20
+--3:
+```
+
+### 2、 范性 for 的语义
+
+范性 for 在自己内部保存三个值:迭代函数，状态常量和控制变量。
+
+```lua
+for <var-list> in <exp-list> do
+    <body> 
+end
+```
+
+我们称变量列表中第一个变量为控制变量，其值为 nil 时循环结束。
+
+范性 for 的执行过程：
+
+* 首先，初始化，计算 in 后面表达式的值，表达式应该返回范性 for 需要的三个值：迭代函数，状态常量和控制变量；
+  与多值赋值一样，如果表达式返回的结果个数不足三个会自动用 nil 补足，多出部分会被忽略。
+* 第二，将状态常量和控制变量作为参数调用迭代函数（注意：对于 for 结构来说，
+  状态常量没有用处，仅仅在初始化时获取他的值并传递给迭代函数）。
+* 第三，将迭代函数返回的值赋给变量列表。
+* 第四，如果返回的第一个值为 nil 循环结束，否则执行循环体。
+* 第五，回到第二步再次调用迭代函数。
+
+更精确的来说：
+
+```lua
+for var_1, ..., var_n in explist do block end
+```
+
+等价于
+
+```lua
+do 
+local _f, _s, _var = explist 
+while true do
+    local var_1, ... , var_n = _f(_s, _var) 
+        _var = var_1 
+    if _var == nil then break end
+        block 
+end 
+end
+```
+
+### 3、 无状态的迭代器
+
+利用状态常量和控制变量的值作为参数被调用。
+
+```lua
+function iter(a, i)
+    i = i + 1
+    local v = a[i]
+    if v then
+        return i, v
+    end
+end 
+
+function ipairs(a) 
+    return iter, a, 0
+end
+
+a = {"one", "two", "three"} 
+for i, v in ipairs(a) do 
+    print(i, v) 
+end
+```
+
+
+## 十、模块
 
 模块类似于一个封装库，从 Lua 5.1 开始，Lua 加入了标准的模块管理机制，可以把一些公用的代码放在一个文件里，
 以 API 接口的形式在其他地方调用，有利于代码的重用和降低代码耦合度。
@@ -1242,7 +1424,7 @@ source ~/.profile
 ```
 
 
-## 十、错误处理
+## 十一、错误处理
 
 ### pcall
 
