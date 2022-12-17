@@ -24,11 +24,12 @@ Lua 将简单的过程语法与基于关联数组和可扩展语义的强大数�
 
 八、[函数](#八函数)
 
-九、[迭代器与泛型 for](#九迭代器与泛型-for)
+九、[编译、执行和错误](#九编译执行和错误)
 
-十、[模块](#十模块)
+十、[迭代器与泛型 for](#十迭代器与泛型-for)
 
-十一、[错误处理](#十一错误处理)
+十一、[模块](#十一模块)
+
 
 ## 一、基本语法
 
@@ -88,6 +89,7 @@ in      local       nil     not         or
 repeat  return      then    true        until 
 while
 ```
+
 
 ## 二、变量
 
@@ -922,7 +924,6 @@ public class FirstSample
 * for 语句定义的变量 i，python 可以访问 lua 不行
 
 
-
 ## 八、函数
 
 函数有两种用途：
@@ -1196,7 +1197,148 @@ Lua 中类似 return g(...)这种格式的调用是尾调用。但是 g 和 g �
 return x[i].foo(x[j] + a*b, i + j)
 ```
 
-## 九、迭代器与泛型 for
+
+## 九、编译、执行和错误
+
+### 1、编译
+
+与函数 `dofile` 类似，函数 `loadfile` 也是从文件中加载 Lua 代码段，但它不会运行代码，只是编译代码，
+然后将编译后的代码段作为函数返回。
+
+两者的关系可以看成以下：
+
+```lua
+function dofile(filename)
+    local f = assert(loadfile(filename))
+    return f()
+end 
+```
+
+当发生错误时，函数 `loadfile` 会返回 nil 及错误信息。
+
+```lua
+local f, err = loadfile('not_exist')
+print(f)            --> nil
+print(err)          --> cannot open not_exist: No such file or directory
+```
+
+函数 `load` 与函数 `loadfile` 类似，不同之处在于该函数从一个字符串或函数中读取代码段，而不是从文件中读取。
+
+```lua
+f = load("i = i + 1")
+i = 0
+f();
+print(i)            --> 1
+```
+
+尽管函数 `load` 的功能很强大，但还是应该谨慎使用，该函数开销较大并且可能会引起诡异的问题。
+
+与 `loadfile` 一样， 当发生错误时，函数 `load` 会返回 nil 及错误信息。
+
+```lua
+local f, err = load('error chunk')
+print(f)            --> nil
+print(err)          --> [string "error chunk"]:1: syntax error near 'chunk'
+```
+
+需要注意的是函数 `load` 总是在全局环境中编译代码段。
+
+```lua
+i = 32
+local i = 0
+f = load("i = i + 1; print(i)")
+f()             --> 33
+```
+
+如果需要对表达式求值，可以在表达式前添加 return。
+
+```lua
+f = load("return 100")
+print(f())             --> 100
+```
+
+也可以使用读取函数作为函数 `load` 的第一个参数，读取函数可以分几次返回一段程序，函数 `load` 会不断调用读取函数直到读取函数返回 nil（表示程序段结束）。
+
+```lua
+count = 0
+local loader = function()
+    count = count + 1
+    if count == 1 then
+        return 'local a = '
+    elseif count == 5 then
+        return '; print(a)'
+    elseif count < 5 then
+        return count
+    end
+    return nil
+end
+
+f = load(loader)
+f()         --> 234  
+```
+
+函数 `loadfile` 加载的文件，文件内的变量，只有在运行代码才会定义它。
+
+```lua
+-- 文件 'foo.lua'
+function foo(x)
+    print(x)
+end
+
+f = load("foo.lua")
+print(foo)          --> nil
+f()                 --> 运行代码
+foo("ok")           --> ok
+```
+
+### 2、预编译
+
+执行下面命令可以生成预编译文件。
+
+```shell
+$ luac -o prog.lc prog.lua
+```
+
+### 3、错误处理和异常
+
+函数 `pcall` 会以一种保护模式来调用它的第一个参数，以便捕获该函数执行中的错误。无论是否有错误发生，函数 `pcall` 都不会引发错误。
+如果没有错误发生，那么 `pcall` 返回 true 及被调用函数的所有返回值，否则，则返回 false 及错误信息。
+
+```lua
+local status, err = pcall(function()
+    error({ code = 121 })
+end)
+print(status)           --> false
+print(err.code)         --> 121
+```
+
+### 4、错误信息和栈回溯
+
+函数 error 还有第二个可选参数 level，用于指出向函数调用层次中的哪层函数报告错误。
+
+函数 `xpcall` 与 `pcall` 类似，第二个参数是消息出来函数，可以获取发出错误时，完整的调用栈的栈回溯，如下。
+
+```shell
+local function foo(str)
+    if type(str) ~= 'string' then
+        error('string expected',2)
+    end
+end
+
+
+local function test()
+    foo(123)
+end
+
+local status, err = xpcall(test, debug.traceback)
+print(status)           --> false
+print(err)
+```
+
+[《using-pcall》](https://riptutorial.com/lua/example/16000/using-pcall)
+
+
+## 十、迭代器与泛型 for
 
 ### 1、迭代器与闭包
 
@@ -1337,7 +1479,7 @@ end
 ```
 
 
-## 十、模块
+## 十一、模块
 
 模块类似于一个封装库，从 Lua 5.1 开始，Lua 加入了标准的模块管理机制，可以把一些公用的代码放在一个文件里，
 以 API 接口的形式在其他地方调用，有利于代码的重用和降低代码耦合度。
@@ -1422,77 +1564,6 @@ export LUA_PATH="~/lua/?.lua;;"
 ```shell
 source ~/.profile
 ```
-
-
-## 十一、错误处理
-
-### pcall
-
-`pcall` 意思是 "protected call"。通常用于向函数添加错误处理。`pcall` 与其他编程语言中的 `try-catch` 非常类似。
-
-`pcall` 的优势在于，当函数发生异常时，不会打断整个脚本的运行。函数内部发生错误时，会抛出错误，剩余的代码会继续执行。
-
-**语法：**
-
-```lua
-pcall( f , arg1,···)
-```
-
-**返回值：**
-
-返回两个值
-
-1、status (boolean)
-
-返回 true 如果执行没有任何错误
-
-返回 false 如果函数内存触发错误
-
-2、return value of the function or error message if an error occurred inside the function block
-
-`pcall` 可用于各种情况，但一种常见的情况是从已提供给您的函数的函数中捕获错误。例如，假设我们有这个功能：
-
-```lua
-local function executeFunction(funcArg, times) then
-    for i = 1, times do
-        local ran, errorMsg = pcall( funcArg )
-        if not ran then
-            error("Function errored on run " .. tostring(i) .. "\n" .. errorMsg)
-        end
-    end
-end
-```
-
-示例-Execution with pcall：
-
-```lua
-function square(a)
-  return a * "a"
-end
-
-local status, retval = pcall(square,10);
-
-print ("Status: ", status)        -- will print "false" because an error was thrown.
-print ("Return Value: ", retval)  -- will print "input:2: attempt to perform arithmetic on a string value"
-print ("Hello World")    -- Prints "Hello World"
-```
-
-示例-Execution of flawless code：
-
-```lua
-function square(a)
-  return a * a
-end
-
-local status, retval = pcall(square,10);
-
-print ("Status: ", status)        -- will print "true" because no errors were thrown 
-print ("Return Value: ", retval)  -- will print "100"
-print ("Hello World")    -- Prints "Hello World"
-```
-
-[《using-pcall》](https://riptutorial.com/lua/example/16000/using-pcall)
-
 
 
 ## 相关链接
