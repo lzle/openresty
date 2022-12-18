@@ -181,7 +181,7 @@ function(函数)、thread(线程)和table(表)。
 
 ### 1、赋值
 
-字符串或串(String)是由数字、字母、下划线组成的一串字符。
+字符串或串(string)是由数字、字母、下划线组成的一串字符。
 
 Lua 语言中字符串可以使用以下三种方式来表示：
 
@@ -216,7 +216,7 @@ Lua
 io.write(page)
 ```
 
-### 2、字符串操作
+### 2、强制类型转换
 
 Lua 会自动在 string 和 number 之间自动进行类型转换，当一个字符串使用算术操作符时，
 string 就会被转成数字。
@@ -241,47 +241,57 @@ print(tostring("nil") == "nil") --> true
 print(tostring({1, 3}))         --> table: 0x056e28d0
 ```
 
-### 3、string 模块
+### 3、字符串标准库
 
 Lua 提供了很多的方法来支持字符串的操作：
 
-**① 字符串全部转为大写字母 `string.upper(s)`**。
+**1、字符串全部转为大写字母 `string.upper(s)`**。
 
 ```lua
 s = string.upper("hello world")
 print(s)        --> HELLO WORLD
 ```
 
-**② 字符串全部转为小写字母 `string.lower(s)`**。
+**2、字符串全部转为小写字母 `string.lower(s)`**。
 
 ```lua
 s = string.lower("HELLO WORLD")
 print(s)        --> hello world
 ```
 
-**③ 字符串反转 `string.reverse(s)`**。
+**3、字符串反转 `string.reverse(s)`**。
 
 ```lua
 s = string.reverse('lua')
 print(s)        --> aul
 ```
 
-**④ 字符串格式化  `string.format(formatstring, ...)`**。
+**4、字符串格式化  `string.format(formatstring, ...)`**。
+
+格式化字符串中的指示符与 C 语言中函数 printf 的规则类似，一个指示符由一个百分号和一个代表格式化方式的字母组成:
+
+```lua
+%d      十进制整数
+%x      十六进制整数
+%f      浮点数
+%s      字符串
+```
+
+示例
 
 ```lua
 s = string.format("the value is:%d", 4)
 print(s)        --> the value is:4
 ```
 
-
-**⑤ 字符串拷贝 `string.rep(s, n, sep)`**。
+**5、字符串拷贝 `string.rep(s, n, sep)`**。
 
 ```lua
 s = string.rep("abcd",2)
 print(s)        --> abcdabcd
 ```
 
-**⑥ 字符串匹配 `string.match(s, pattern, init)`**。
+**6、字符串匹配 `string.match(s, pattern, init)`**。
 
 string.match() 只寻找源字串 str 中的第一个配对. 参数 init 可选, 指定搜寻过程的起点, 默认为1。
 在成功配对时, 函数将返回配对表达式中的所有捕获结果; 如果没有设置捕获标记, 则返回整个配对字符串。
@@ -294,7 +304,7 @@ print(s)        --> 2 questions
 
 Looks for the first match of pattern in the string s. If it finds one, then match returns the captures from the pattern; otherwise it returns nil. If pattern specifies no captures, then the whole match is returned. A third, optional numerical argument init specifies where to start the search; its default value is 1 and can be negative.
 
-**⑦ 字符串匹配 `string.gmatch(s, pattern)`**。
+**7、字符串匹配 `string.gmatch(s, pattern)`**。
 返回一个迭代器函数，每一次调用这个函数，返回一个在字符串 str 找到的下一个符合 pattern 描述的子串。
 如果参数 pattern 描述的字符串没有找到，迭代函数返回nil。
 
@@ -311,7 +321,7 @@ Returns an iterator function that, each time it is called, returns the next capt
 
 For this function, a '^' at the start of a pattern does not work as an anchor, as this would prevent the iteration.
 
-**⑧ 字符串截取 `string.sub(s, i, j)`**。
+**8、字符串截取 `string.sub(s, i, j)`**。
 
 * s：要截取的字符串。
 * i：截取开始位置。
@@ -324,7 +334,7 @@ print(s)        --> lo,wo
 
 Returns the substring of s that starts at i and continues until j; i and j can be negative. If j is absent, then it is assumed to be equal to -1 (which is the same as the string length). In particular, the call string.sub(s,1,j) returns a prefix of s with length j, and string.sub(s, -i) returns a suffix of s with length i.
 
-**⑨ 在字符串中替换 `string.gsub(s, pattern, repl, n)`**。
+**9、在字符串中替换 `string.gsub(s, pattern, repl, n)`**。
 
 s 为要操作的字符串， pattern 为被替换的字符，repl 要替换的字符，
 n 替换次数（可以忽略，则全部替换），如：
@@ -369,7 +379,7 @@ x = string.gsub("$name-$version.tar.gz", "%$(%w+)", t)
 --> x="lua-5.1.tar.gz"
 ```
 
-**⑩ 查找字符串 `string.find(s, pattern, init, plain)`**。
+**10、查找字符串 `string.find(s, pattern, init, plain)`**。
 
 在一个指定的目标字符串 str 中搜索指定的内容 substr，如果找到了一个匹配的子串，
 就会返回这个子串的起始索引和结束索引，不存在则返回 nil。
@@ -383,9 +393,27 @@ Looks for the first match of pattern in the string s. If it finds a match, then 
 
 If the pattern has captures, then in a successful match the captured values are also returned, after the two indices.
 
-**⑪  字符串长度 `string.len (s)`**。
+**11、字符串长度 `string.len(s)`**。
 
 Receives a string and returns its length. The empty string "" has length 0. Embedded zeros are counted, so "a\000bc\000" has length 5.
+
+**12、转换整数为 ASCII 对应的字符  `string.char(...)`**。
+
+函数接收零个或多个整数作为参数，然后将每个整数转换对应的字符，最后返回由这些字符连接而成的字符串。
+
+```lua
+print(string.char(97))          -->a
+print(string.char(97, 98))      -->ab
+```
+
+**13、转换字符为 ASCII 对应的整数  `string.byte(s, i, j)`**。
+
+函数返回字符 s 索引 i 到 j 之间(含)的所有字符的数值表示，i 和 j 都是可选参数。
+
+```lua
+print(string.byte('abc'))         --> 97
+print(string.byte('abc', 1, 2))   --> 97 98
+```
 
 
 ## 四、数值
