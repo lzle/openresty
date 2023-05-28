@@ -27,6 +27,8 @@
     * [ngx.re.gsub](#ngxregsub)
     * [ngx.semaphore](#ngxsemaphore)
     * [ngx.thread.spawn](#ngxthreadspawn)
+    * [ngx.thread.wait](#ngxthreadwait)
+    * [ngx.thread.kill](#ngxthreadkill)
 * [Lua Resty](#Resty)
     * [lua-resty-core](#lua-resty-core)
     * [lua-resty-string](#lua-resty-string)
@@ -1051,6 +1053,69 @@ location = /t {
 ```
 
 [官网示例](https://github.com/openresty/lua-nginx-module#ngxthreadspawn)
+
+
+### ngx.thread.wait
+
+等待子线程执行结果，只有 "parent coroutine" 可以等待 "light thread"，其他情况会导致错误。
+
+```
+function f()
+    ngx.sleep(0.2)
+    ngx.say("f: hello")
+    return "f done"
+end
+
+function g()
+    ngx.sleep(0.1)
+    ngx.say("g: hello")
+    return "g done"
+end
+
+local tf, err = ngx.thread.spawn(f)
+if not tf then
+    ngx.say("failed to spawn thread f: ", err)
+    return
+end
+
+ngx.say("f thread created: ", coroutine.status(tf))
+
+local tg, err = ngx.thread.spawn(g)
+if not tg then
+    ngx.say("failed to spawn thread g: ", err)
+    return
+end
+
+ngx.say("g thread created: ", coroutine.status(tg))
+
+ok, res = ngx.thread.wait(tf, tg)
+if not ok then
+    ngx.say("failed to wait: ", res)
+    return
+end
+
+ngx.say("res: ", res)
+
+-- stop the "world", aborting other running threads
+ngx.exit(ngx.OK)
+```
+
+执行结果
+
+```
+f thread created: running
+g thread created: running
+g: hello
+res: g done
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxthreadwait)
+
+
+### ngx.thread.kill
+
+杀死子线程，也只有 "parent coroutine" 可以杀死子线程，由于内核的限制，运行的 "light thread"
+正在 pending Nginx subrequests 是不可以被杀死的（如 initiated by ngx.location.capture for example)。
 
 
 ## Resty
