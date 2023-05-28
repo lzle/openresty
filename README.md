@@ -25,6 +25,7 @@
     * [ngx.re.gmatch](#ngxregmatch)
     * [ngx.re.sub](#ngxresub)
     * [ngx.re.gsub](#ngxregsub)
+    * [ngx.semaphore](#ngxsemaphore)
 * [Lua Resty](#Resty)
     * [lua-resty-core](#lua-resty-core)
     * [lua-resty-string](#lua-resty-string)
@@ -812,6 +813,109 @@ end
 ```
 
 [官网示例](https://github.com/openresty/lua-nginx-module#ngxregsub) 
+
+
+### ngx.semaphore
+
+在相同的`context`线程中同步。
+
+```
+location = /t {
+    content_by_lua_block {
+        local semaphore = require "ngx.semaphore"
+        local sema = semaphore.new()
+
+        local function handler()
+            ngx.say("sub thread: waiting on sema...")
+
+            local ok, err = sema:wait(1)  -- wait for a second at most
+            if not ok then
+                ngx.say("sub thread: failed to wait on sema: ", err)
+            else
+                ngx.say("sub thread: waited successfully.")
+            end
+        end
+
+        local co = ngx.thread.spawn(handler)
+
+        ngx.say("main thread: sleeping for a little while...")
+
+        ngx.sleep(0.1)  -- wait a bit
+
+        ngx.say("main thread: posting to sema...")
+
+        sema:post(1)
+
+        ngx.say("main thread: end.")
+    }
+}
+
+```
+The example location above produces a response output like this:
+```
+sub thread: waiting on sema...
+main thread: sleeping for a little while...
+main thread: posting to sema...
+main thread: end.
+sub thread: waited successfully.
+```
+
+在不相同的`context`线程中同步，`ngx.timer.at`生成的线程与主线程不共享`ngx.ctx`。
+
+```
+location = /t {
+    content_by_lua_block {
+        local semaphore = require "ngx.semaphore"
+        local sema = semaphore.new()
+
+        local outputs = {}
+        local i = 1
+
+        local function out(s)
+            outputs[i] = s
+            i = i + 1
+        end
+
+        local function handler()
+            out("timer thread: sleeping for a little while...")
+
+            ngx.sleep(0.1)  -- wait a bit
+
+            out("timer thread: posting on sema...")
+
+            sema:post(1)
+        end
+
+        assert(ngx.timer.at(0, handler))
+
+        out("main thread: waiting on sema...")
+
+        local ok, err = sema:wait(1)  -- wait for a second at most
+        if not ok then
+            out("main thread: failed to wait on sema: ", err)
+        else
+            out("main thread: waited successfully.")
+        end
+
+        out("main thread: end.")
+
+        ngx.say(table.concat(outputs, "\n"))
+    }
+}
+```
+The example location above produces a response body like this.
+
+```
+main thread: waiting on sema...
+timer thread: sleeping for a little while...
+timer thread: posting on sema...
+main thread: waited successfully.
+main thread: end.
+```
+
+The same applies to different request contexts as long as these requests are served by the same nginx worker process.
+
+[官网示例](https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/semaphore.md)
 
 
 ## Resty
