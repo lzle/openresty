@@ -26,6 +26,7 @@
     * [ngx.re.sub](#ngxresub)
     * [ngx.re.gsub](#ngxregsub)
     * [ngx.semaphore](#ngxsemaphore)
+    * [ngx.thread.spawn](#ngxthreadspawn)
 * [Lua Resty](#Resty)
     * [lua-resty-core](#lua-resty-core)
     * [lua-resty-string](#lua-resty-string)
@@ -817,7 +818,7 @@ end
 
 ### ngx.semaphore
 
-在相同的`context`线程中同步。
+1、在相同的 `context` 线程中同步。
 
 ```
 location = /t {
@@ -860,7 +861,7 @@ main thread: end.
 sub thread: waited successfully.
 ```
 
-在不相同的`context`线程中同步，`ngx.timer.at`生成的线程与主线程不共享`ngx.ctx`。
+2、在不相同的 `context` 线程中同步，`ngx.timer.at` 生成的线程与主线程不共享 `ngx.ctx`。
 
 ```
 location = /t {
@@ -916,6 +917,140 @@ main thread: end.
 The same applies to different request contexts as long as these requests are served by the same nginx worker process.
 
 [官网示例](https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/semaphore.md)
+
+
+### ngx.thread.spawn
+
+生成一个新的用户级 "light thread" 执行函数，返回 "Lua coroutine" 对象。
+在 `ngx.thread.spawn` return之前，函数会一直执行，直到函数 return、aborts with an error、yield。
+
+在 "light thread" 触发异常终止，并不会影响到 "entry thread"，在当前的 "light thread" 下还可以执行此方法创建新的线程。
+
+**注意事项**
+
+1、"entry thread" 和 "light thread" 都执行完毕，请求才会终止。
+
+```
+location = /t {
+    content_by_lua_block {
+
+        local function handler()
+            ngx.say("sub thread: start")
+            while true do
+              ngx.say("sub thread: loop")
+              ngx.log(ngx.ERR,"sub thread: loop")
+              ngx.sleep(0.2)
+            end;
+        end
+
+        local co = ngx.thread.spawn(handler)
+        ngx.say("main thread: sleeping for a little while...")
+        ngx.sleep(1)  -- wait a bit
+        ngx.say("main thread: end.")
+    }
+}
+```
+
+请求上面路径时，请求永远不会终止（正常没有创建子线程情况下，主线程会正常结束请求），即使 CTRL+C 强制终止请求，"sub thread" 依然会在后台执行。
+
+2、"entry thread" 和" light thread" 在任意一个中，执行下面 ngx.exit, ngx.exec, ngx.redirect, or ngx.req.set_uri(uri, true) 
+函数，请求会正常终止。
+
+```
+location = /t {
+    content_by_lua_block {
+
+        local function handler()
+            ngx.say("sub thread: start")
+            while true do
+              ngx.say("sub thread: loop")
+              ngx.log(ngx.ERR,"sub thread: loop")
+              ngx.sleep(0.2)
+            end;
+        end
+
+        local co = ngx.thread.spawn(handler)
+        ngx.say("main thread: sleeping for a little while...")
+        ngx.sleep(1)  -- wait a bit
+        ngx.say("main thread: end.")
+        ngx.exit(ngx.HTTP_OK)
+    }
+}
+```
+
+上面代码，请求会正常终止，"sub thread" 也会停止。
+
+3、在 "entry thread" 中抛出错误，请求会终止、"sub thread" 也会停止。
+
+```
+location = /t {
+    content_by_lua_block {
+
+        local function handler()
+            ngx.say("sub thread: start")
+            while true do
+              ngx.say("sub thread: loop")
+              ngx.log(ngx.ERR,"sub thread: loop")
+              ngx.sleep(0.2)
+            end;
+        end
+
+        local co = ngx.thread.spawn(handler)
+        ngx.say("main thread: sleeping for a little while...")
+        ngx.sleep(1)  -- wait a bit
+        ngx.say("main thread: end.")
+        error
+    }
+}
+```
+
+4、"light thread" 可能会变成 "zombie" 状态，如果 "light thread" 已经终止（成功或失败），parent coroutine 依然存活，
+并且 parent coroutine 没有通过 `ngx.thread.wait` 等待子线程终止。
+
+
+5、函数 `ngx.thread.spwan` 特别适合并发流式请求，例如：
+
+```
+ -- query mysql, memcached, and a remote http service at the same time,
+ -- output the results in the order that they
+ -- actually return the results.
+
+ local mysql = require "resty.mysql"
+ local memcached = require "resty.memcached"
+
+ local function query_mysql()
+     local db = mysql:new()
+     db:connect{
+                 host = "127.0.0.1",
+                 port = 3306,
+                 database = "test",
+                 user = "monty",
+                 password = "mypass"
+               }
+     local res, err, errno, sqlstate =
+             db:query("select * from cats order by id asc")
+     db:set_keepalive(0, 100)
+     ngx.say("mysql done: ", cjson.encode(res))
+ end
+
+ local function query_memcached()
+     local memc = memcached:new()
+     memc:connect("127.0.0.1", 11211)
+     local res, err = memc:get("some_key")
+     ngx.say("memcached done: ", res)
+ end
+
+ local function query_http()
+     local res = ngx.location.capture("/my-http-proxy")
+     ngx.say("http done: ", res.body)
+ end
+
+ ngx.thread.spawn(query_mysql)      -- create thread 1
+ ngx.thread.spawn(query_memcached)  -- create thread 2
+ ngx.thread.spawn(query_http)       -- create thread 3
+```
+
+[官网示例](https://github.com/openresty/lua-nginx-module#ngxthreadspawn)
 
 
 ## Resty
