@@ -7,7 +7,7 @@
 * [LuaJIT & Lua](#luajit--lua)
     * [语法](lua/README.md)
     * [发展](#发展)
-    * [优势](#优势)
+    * [性能](#优势)
     * [FFI](#FFI)
     * [NYI](#NYI)
 * [性能优化](#性能优化)
