@@ -655,6 +655,34 @@ nil
 `table` 根据自定义排序方法 `comp` 进行排序。
 
 
+### 6、如何判断 table 为空？
+
+通过上面的介绍，使用 '#' 来统计元素个数是否为 0 显示是不正确的。
+
+```
+local tb = { key1 = 'value1' }
+
+if #tb == 0 then
+   print('empty')
+end
+
+empty
+```
+
+可以使用next函数进行遍历，判断是否为空。
+
+```
+local tb = { key1 = 'value1' }
+
+if next(tb) == nil then
+    print('empty')
+else
+    print('not empty')
+end
+
+not empty
+```
+
 ## 六、运算符
 
 ### 1、算术运算符
