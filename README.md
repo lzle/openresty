@@ -32,10 +32,11 @@
 * [Lua Resty](#Resty)
     * [lua-resty-core](#lua-resty-core)
     * [lua-resty-string](#lua-resty-string)
+* [Test::Nginx](#testnginx)
+    * [Test](#Test)
 * [性能分析](#性能分析)
     * [火焰图](#火焰图)
-    
-    
+
 ## 入门
 
 OpenResty 诞生于 2007 年，基于成熟的开源组件——NGINX 和 LuaJIT。
@@ -59,9 +60,9 @@ $ yum -y install pcre-devel-8.32 openssl-devel-1.0.2k openssl-1.0.2k
 源码编译安装：
 
 ```shell
-$ wget https://openresty.org/download/openresty-1.11.2.1.tar.gz
+$ wget https://openresty.org/download/openresty-1.19.9.1.tar.gz
 
-$ tar zxvf openresty-1.11.2.1.tar.gz $$ cd openresty-1.11.2.1
+$ tar zxvf openresty-1.19.9.1.tar.gz $$ cd openresty-1.19.9.1
 
 $ ./configure  --with-debug  --with-cc-opt="-g3 -O2"  --with-ld-opt="-g3 -O2" --prefix=/usr/local/openresty
 
@@ -72,7 +73,7 @@ $ make install
 
 ```shell
 $ /usr/local/openresty/bin/openresty -v
-nginx version: openresty/1.11.2.1
+nginx version: openresty/1.19.9.1
 ```
 
 ### OpenResty CLI
@@ -1174,6 +1175,56 @@ res: g done
 * resty.aes
 
 [官网示例](https://github.com/openresty/lua-resty-string)
+
+
+## Test::Nginx
+
+### Test
+
+安装基础环境
+
+```
+$ cpanm Test::Base
+$ cpanm Test::Nginx::Socket::Lua
+```
+
+验证
+```
+$ perl -MTest::Nginx::Socket::Lua -e 'print "OK\n"'
+OK
+```
+
+测试示例
+
+```
+=== TEST 1: hello, world
+
+--- config
+location = /t {
+    echo "hello, world!";
+}
+
+--- request
+GET /t
+
+--- response_body
+hello, world!
+
+# 确认响应状态码
+--- error_code: 200
+
+# 仅运行此block
+--- ONLY
+
+# 跳过此block
+--- SKIP
+```
+
+执行
+
+```
+$ TEST_NGINX_BINARY="/usr/local/openresty/bin/openresty" prove -v
+```
 
 
 ## 相关链接
