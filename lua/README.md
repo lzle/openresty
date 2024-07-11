@@ -427,6 +427,8 @@ nubmer 类型表示实数，Lua 中没有整数。一般有个错误的看法 CP
 4   0.4   4.57e-3   0.3e12  5e+20
 ```
 
+### 1、转换
+
 可以调用 tonumber() 将数字转成字符串
 
 ```lua
@@ -446,6 +448,26 @@ print(tonumber('nil') == nil)   --> true
 print(tonumber(nil) == nil)     --> true
 ```
 
+### 2、随机数
+
+math.random(): 不带参数调用时，返回一个在0（包含）到1（不包含）之间的伪随机数。
+
+```lua
+print(math.random())  -- 输出：0.0012512588889884 (每次运行结果会不同)
+```
+
+math.random(m, n): 带两个参数调用时，返回一个在m和n之间的整数伪随机数。m和n都必须是整数。
+
+```lua
+print(math.random(1, 10))  -- 输出：10 (每次运行结果会不同，但都在1到10之间, 包含1、10)
+```
+
+注意：在使用math.random之前，通常需要先调用math.randomseed(os.time())来设置随机数种子，以确保每次运行程序时生成的随机数序列都不同。
+
+```lua
+math.randomseed(os.time())
+print(math.random(1, 10))  -- 输出：每次运行结果都会不同
+```
 
 ## 五、表
 
