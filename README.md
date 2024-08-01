@@ -1184,6 +1184,9 @@ res: g done
 安装基础环境
 
 ```
+$ yum -y install epel-release
+$ yum install perl-App-cpanminus
+
 $ cpanm Test::Base
 $ cpanm Test::Nginx::Socket::Lua
 ```
